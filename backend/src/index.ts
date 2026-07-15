@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import multer from "multer";
 import { authenticate } from "./middleware/auth";
 import documentsRouter from "./routes/documents";
 import shipmentsRouter from "./routes/shipments";
@@ -28,8 +29,22 @@ app.use("/api/validations", authenticate, validationsRouter);
 app.use("/api/webhooks", authenticate, webhooksRouter);
 app.use("/api/keys", authenticate, apiKeysRouter);
 
-// ─── Error Handler ─────────────────────────────────────────────────────────
+// ─── Multer Error Handler ──────────────────────────────────────────────────
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      res.status(413).json({ error: "File too large. Maximum size is 50MB." });
+      return;
+    }
+    res.status(400).json({ error: `Upload error: ${err.message}` });
+    return;
+  }
+
+  if (err.message?.startsWith("Unsupported file type")) {
+    res.status(400).json({ error: err.message });
+    return;
+  }
+
   console.error("Unhandled error:", err);
   res.status(500).json({
     error: "Internal server error",
